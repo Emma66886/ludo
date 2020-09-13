@@ -13,4 +13,4 @@ npm run build
 ```
 Open index.html
 
-### By <a href="https://instagram.com/teen_developer"></a>
+### By <a href="https://instagram.com/teen_developer">Savio Martin</a>
