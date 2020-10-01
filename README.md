@@ -1,10 +1,10 @@
-## ludo
+## Ludo
 🎲 Ludo Game built with Node js helps you play ludo with friends as well as bot
 
 ## Play Live
 coming soon
 
-## Buld
+## Build
 ```
 npm install
 ```
