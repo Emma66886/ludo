@@ -14,7 +14,7 @@ Ludo game starts with four tokens placed in each player's starting box. A dice i
   - Knocking out other's token will give you an extra chance to roll the dice again.
 
 ## Play Live
-coming soon
+http://playludo.tk/
 
 ## Build
 ```
