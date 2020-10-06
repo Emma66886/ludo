@@ -1,3 +1,8 @@
+
+//Savio Martin
+//https://github.com/saviomartin
+//https://instagram.com/teen_developer
+
 var isBotsTurn = function isBotsTurn(game) {
   return game.game_state === 2 && game.players[game.active_player].type === "BOT";
 };
