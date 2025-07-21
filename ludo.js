@@ -2081,13 +2081,18 @@ var MultiplayerGame = function (_React$Component) {
       connected: false,
       roomId: '',
       playerName: '',
+      gameMode: 'individual', // 'individual', 'team', or '1v1'
       currentPlayer: null,
       players: [],
+      teams: { team1: [], team2: [] },
       game: Object.assign({}, game_init),
       board: JSON.parse(JSON.stringify(board_init)),
       showJoinForm: true,
       gameMessage: '',
-      isMyTurn: false
+      isMyTurn: false,
+      // For 1v1 mode
+      playerColors: [],
+      currentColor: null
     };
 
     _this.initSocket = _this.initSocket.bind(_this);
@@ -2132,10 +2137,11 @@ var MultiplayerGame = function (_React$Component) {
         _this2.setState({
           currentPlayer: data.player,
           players: data.players,
+          teams: data.teams || { team1: [], team2: [] },
           game: data.gameState,
           board: data.board,
           showJoinForm: false,
-          gameMessage: 'You joined as ' + data.player.color + ' player'
+          gameMessage: 'You joined as ' + data.player.color + ' player' + (data.player.team ? ' on ' + data.player.team : '')
         });
       });
 
@@ -2143,8 +2149,9 @@ var MultiplayerGame = function (_React$Component) {
         console.log('Player joined:', data);
         _this2.setState({
           players: data.players,
+          teams: data.teams || { team1: [], team2: [] },
           game: data.gameState,
-          gameMessage: data.player.name + ' joined as ' + data.player.color
+          gameMessage: data.player.name + ' joined as ' + data.player.color + (data.player.team ? ' on ' + data.player.team : '')
         });
       });
 
@@ -2182,12 +2189,33 @@ var MultiplayerGame = function (_React$Component) {
         });
       });
 
+      socket.on('game-mode-mismatch', function (data) {
+        _this2.setState({
+          gameMessage: 'This room is set to ' + data.expectedMode + ' mode. Please choose the correct mode or try a different room.'
+        });
+      });
+
       socket.on('move-made', function (data) {
         console.log('Move made:', data);
+        var message = 'Player made a move';
+
+        if (data.gameOver) {
+          if (data.winningTeam) {
+            var team1Colors = ['red', 'yellow'];
+            var team2Colors = ['green', 'blue'];
+            var winnerColors = data.winningTeam === 'team1' ? team1Colors : team2Colors;
+            message = 'Game Over! Team ' + data.winningTeam + ' (' + winnerColors.join(' & ') + ') wins!';
+          } else if (data.winner && _this2.state.gameMode === '1v1') {
+            message = 'Game Over! ' + data.winner.name + ' wins with their colors!';
+          } else {
+            message = 'Game Over! Player wins!';
+          }
+        }
+
         _this2.setState({
           game: data.gameState,
           board: data.board,
-          gameMessage: 'Player made a move',
+          gameMessage: message,
           isMyTurn: _this2.isMyTurn(data.gameState)
         });
       });
@@ -2198,6 +2226,19 @@ var MultiplayerGame = function (_React$Component) {
       var _this3 = this;
 
       if (!this.state.currentPlayer || !this.state.players.length) return false;
+
+      if (this.state.gameMode === '1v1') {
+        // In 1v1 mode, check if any of our colors is the active player
+        var myPlayer = this.state.players.find(function (p) {
+          return p.id === _this3.state.currentPlayer.id;
+        });
+        if (myPlayer && myPlayer.colors) {
+          var activePlayerObj = gameState.players[gameState.active_player];
+          var activeColor = activePlayerObj ? activePlayerObj.color : null;
+          return myPlayer.colors.includes(activeColor);
+        }
+      }
+
       var myPlayerIndex = this.state.players.findIndex(function (p) {
         return p.id === _this3.state.currentPlayer.id;
       });
@@ -2209,14 +2250,19 @@ var MultiplayerGame = function (_React$Component) {
       var _state = this.state,
           socket = _state.socket,
           roomId = _state.roomId,
-          playerName = _state.playerName;
+          playerName = _state.playerName,
+          gameMode = _state.gameMode;
 
       if (!socket || !roomId.trim() || !playerName.trim()) {
         this.setState({ gameMessage: 'Please enter both room ID and your name' });
         return;
       }
 
-      socket.emit('join-room', { roomId: roomId.trim(), playerName: playerName.trim() });
+      socket.emit('join-room', {
+        roomId: roomId.trim(),
+        playerName: playerName.trim(),
+        gameMode: gameMode
+      });
     }
   }, {
     key: 'startGame',
@@ -2254,8 +2300,10 @@ var MultiplayerGame = function (_React$Component) {
           game = _state2.game,
           board = _state2.board,
           players = _state2.players,
+          teams = _state2.teams,
           currentPlayer = _state2.currentPlayer,
-          isMyTurn = _state2.isMyTurn;
+          isMyTurn = _state2.isMyTurn,
+          gameMode = _state2.gameMode;
 
 
       if (!connected) {
@@ -2263,7 +2311,7 @@ var MultiplayerGame = function (_React$Component) {
           'div',
           { className: 'multiplayer-container', __source: {
               fileName: _jsxFileName,
-              lineNumber: 154
+              lineNumber: 197
             },
             __self: this
           },
@@ -2271,7 +2319,7 @@ var MultiplayerGame = function (_React$Component) {
             'div',
             { className: 'connection-status', __source: {
                 fileName: _jsxFileName,
-                lineNumber: 155
+                lineNumber: 198
               },
               __self: this
             },
@@ -2280,7 +2328,7 @@ var MultiplayerGame = function (_React$Component) {
               {
                 __source: {
                   fileName: _jsxFileName,
-                  lineNumber: 156
+                  lineNumber: 199
                 },
                 __self: this
               },
@@ -2295,7 +2343,7 @@ var MultiplayerGame = function (_React$Component) {
           'div',
           { className: 'multiplayer-container', __source: {
               fileName: _jsxFileName,
-              lineNumber: 164
+              lineNumber: 207
             },
             __self: this
           },
@@ -2303,7 +2351,7 @@ var MultiplayerGame = function (_React$Component) {
             'div',
             { className: 'join-form', __source: {
                 fileName: _jsxFileName,
-                lineNumber: 165
+                lineNumber: 208
               },
               __self: this
             },
@@ -2312,7 +2360,7 @@ var MultiplayerGame = function (_React$Component) {
               {
                 __source: {
                   fileName: _jsxFileName,
-                  lineNumber: 166
+                  lineNumber: 209
                 },
                 __self: this
               },
@@ -2322,7 +2370,7 @@ var MultiplayerGame = function (_React$Component) {
               'div',
               { className: 'form-group', __source: {
                   fileName: _jsxFileName,
-                  lineNumber: 167
+                  lineNumber: 210
                 },
                 __self: this
               },
@@ -2331,7 +2379,7 @@ var MultiplayerGame = function (_React$Component) {
                 {
                   __source: {
                     fileName: _jsxFileName,
-                    lineNumber: 168
+                    lineNumber: 211
                   },
                   __self: this
                 },
@@ -2346,7 +2394,7 @@ var MultiplayerGame = function (_React$Component) {
                 placeholder: 'Enter your name',
                 __source: {
                   fileName: _jsxFileName,
-                  lineNumber: 169
+                  lineNumber: 212
                 },
                 __self: this
               })
@@ -2355,7 +2403,7 @@ var MultiplayerGame = function (_React$Component) {
               'div',
               { className: 'form-group', __source: {
                   fileName: _jsxFileName,
-                  lineNumber: 176
+                  lineNumber: 219
                 },
                 __self: this
               },
@@ -2364,7 +2412,7 @@ var MultiplayerGame = function (_React$Component) {
                 {
                   __source: {
                     fileName: _jsxFileName,
-                    lineNumber: 177
+                    lineNumber: 220
                   },
                   __self: this
                 },
@@ -2379,16 +2427,91 @@ var MultiplayerGame = function (_React$Component) {
                 placeholder: 'Enter room ID (e.g., room123)',
                 __source: {
                   fileName: _jsxFileName,
-                  lineNumber: 178
+                  lineNumber: 221
                 },
                 __self: this
               })
             ),
             React.createElement(
+              'div',
+              { className: 'form-group', __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 228
+                },
+                __self: this
+              },
+              React.createElement(
+                'label',
+                {
+                  __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 229
+                  },
+                  __self: this
+                },
+                'Game Mode:'
+              ),
+              React.createElement(
+                'select',
+                {
+                  value: this.state.gameMode,
+                  onChange: function onChange(e) {
+                    return _this4.setState({ gameMode: e.target.value });
+                  },
+                  className: 'game-mode-select',
+                  __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 230
+                  },
+                  __self: this
+                },
+                React.createElement(
+                  'option',
+                  { value: 'individual', __source: {
+                      fileName: _jsxFileName,
+                      lineNumber: 235
+                    },
+                    __self: this
+                  },
+                  'Individual (2-4 players)'
+                ),
+                React.createElement(
+                  'option',
+                  { value: 'team', __source: {
+                      fileName: _jsxFileName,
+                      lineNumber: 236
+                    },
+                    __self: this
+                  },
+                  'Team Mode (2 vs 2)'
+                ),
+                React.createElement(
+                  'option',
+                  { value: '1v1', __source: {
+                      fileName: _jsxFileName,
+                      lineNumber: 237
+                    },
+                    __self: this
+                  },
+                  '1 vs 1 (Two Colors Each)'
+                )
+              ),
+              React.createElement(
+                'div',
+                { className: 'mode-description', __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 239
+                  },
+                  __self: this
+                },
+                gameMode === 'team' ? 'Team mode: Red & Yellow vs Green & Blue. Need exactly 4 players.' : gameMode === '1v1' ? '1v1 mode: Each player controls 2 colors (8 pieces total). Player 1 gets Red & Green, Player 2 gets Yellow & Blue.' : 'Individual mode: Every player for themselves. 2-4 players.'
+              )
+            ),
+            React.createElement(
               'button',
               { onClick: this.joinRoom, className: 'join-btn', __source: {
                   fileName: _jsxFileName,
-                  lineNumber: 185
+                  lineNumber: 248
                 },
                 __self: this
               },
@@ -2398,7 +2521,7 @@ var MultiplayerGame = function (_React$Component) {
               'div',
               { className: 'game-message', __source: {
                   fileName: _jsxFileName,
-                  lineNumber: 188
+                  lineNumber: 251
                 },
                 __self: this
               },
@@ -2412,7 +2535,7 @@ var MultiplayerGame = function (_React$Component) {
         'div',
         { className: 'multiplayer-container', __source: {
             fileName: _jsxFileName,
-            lineNumber: 195
+            lineNumber: 258
           },
           __self: this
         },
@@ -2420,7 +2543,7 @@ var MultiplayerGame = function (_React$Component) {
           'div',
           { className: 'game-info', __source: {
               fileName: _jsxFileName,
-              lineNumber: 196
+              lineNumber: 259
             },
             __self: this
           },
@@ -2429,7 +2552,7 @@ var MultiplayerGame = function (_React$Component) {
             {
               __source: {
                 fileName: _jsxFileName,
-                lineNumber: 197
+                lineNumber: 260
               },
               __self: this
             },
@@ -2438,9 +2561,183 @@ var MultiplayerGame = function (_React$Component) {
           ),
           React.createElement(
             'div',
+            { className: 'game-mode-info', __source: {
+                fileName: _jsxFileName,
+                lineNumber: 261
+              },
+              __self: this
+            },
+            React.createElement(
+              'strong',
+              {
+                __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 262
+                },
+                __self: this
+              },
+              'Mode:'
+            ),
+            ' ',
+            game.game_mode === 'team' ? '2 vs 2 Teams' : game.game_mode === '1v1' ? '1 vs 1 (Two Colors)' : 'Individual'
+          ),
+          game.game_mode === 'team' ? React.createElement(
+            'div',
+            { className: 'teams-display', __source: {
+                fileName: _jsxFileName,
+                lineNumber: 270
+              },
+              __self: this
+            },
+            React.createElement(
+              'div',
+              { className: 'team team1', __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 271
+                },
+                __self: this
+              },
+              React.createElement(
+                'h4',
+                {
+                  __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 272
+                  },
+                  __self: this
+                },
+                'Team 1 (Red & Yellow)'
+              ),
+              teams.team1.map(function (player) {
+                return React.createElement(
+                  'div',
+                  { key: player.id, className: 'player-info ' + player.color, __source: {
+                      fileName: _jsxFileName,
+                      lineNumber: 274
+                    },
+                    __self: _this4
+                  },
+                  player.name,
+                  ' (',
+                  player.color,
+                  ')',
+                  currentPlayer && player.id === currentPlayer.id && ' - You'
+                );
+              })
+            ),
+            React.createElement(
+              'div',
+              { className: 'team team2', __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 280
+                },
+                __self: this
+              },
+              React.createElement(
+                'h4',
+                {
+                  __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 281
+                  },
+                  __self: this
+                },
+                'Team 2 (Green & Blue)'
+              ),
+              teams.team2.map(function (player) {
+                return React.createElement(
+                  'div',
+                  { key: player.id, className: 'player-info ' + player.color, __source: {
+                      fileName: _jsxFileName,
+                      lineNumber: 283
+                    },
+                    __self: _this4
+                  },
+                  player.name,
+                  ' (',
+                  player.color,
+                  ')',
+                  currentPlayer && player.id === currentPlayer.id && ' - You'
+                );
+              })
+            )
+          ) : game.game_mode === '1v1' ? React.createElement(
+            'div',
+            { className: 'teams-display', __source: {
+                fileName: _jsxFileName,
+                lineNumber: 291
+              },
+              __self: this
+            },
+            React.createElement(
+              'div',
+              { className: 'player-1v1', __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 292
+                },
+                __self: this
+              },
+              React.createElement(
+                'h4',
+                {
+                  __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 293
+                  },
+                  __self: this
+                },
+                'Player 1 (Red & Green)'
+              ),
+              players.length > 0 && React.createElement(
+                'div',
+                { className: 'player-info multi-color', __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 295
+                  },
+                  __self: this
+                },
+                players[0].name,
+                ' (Red & Green)',
+                currentPlayer && players[0].id === currentPlayer.id && ' - You'
+              )
+            ),
+            React.createElement(
+              'div',
+              { className: 'player-1v1', __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 301
+                },
+                __self: this
+              },
+              React.createElement(
+                'h4',
+                {
+                  __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 302
+                  },
+                  __self: this
+                },
+                'Player 2 (Yellow & Blue)'
+              ),
+              players.length > 1 && React.createElement(
+                'div',
+                { className: 'player-info multi-color', __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 304
+                  },
+                  __self: this
+                },
+                players[1].name,
+                ' (Yellow & Blue)',
+                currentPlayer && players[1].id === currentPlayer.id && ' - You'
+              )
+            )
+          ) : React.createElement(
+            'div',
             { className: 'players-list', __source: {
                 fileName: _jsxFileName,
-                lineNumber: 198
+                lineNumber: 312
               },
               __self: this
             },
@@ -2449,7 +2746,7 @@ var MultiplayerGame = function (_React$Component) {
               {
                 __source: {
                   fileName: _jsxFileName,
-                  lineNumber: 199
+                  lineNumber: 313
                 },
                 __self: this
               },
@@ -2462,7 +2759,7 @@ var MultiplayerGame = function (_React$Component) {
                 'div',
                 { key: player.id, className: 'player-info ' + player.color, __source: {
                     fileName: _jsxFileName,
-                    lineNumber: 201
+                    lineNumber: 315
                   },
                   __self: _this4
                 },
@@ -2479,7 +2776,7 @@ var MultiplayerGame = function (_React$Component) {
             'button',
             { onClick: this.startGame, className: 'start-btn', __source: {
                 fileName: _jsxFileName,
-                lineNumber: 210
+                lineNumber: 325
               },
               __self: this
             },
@@ -2489,7 +2786,7 @@ var MultiplayerGame = function (_React$Component) {
             'div',
             { className: 'turn-indicator', __source: {
                 fileName: _jsxFileName,
-                lineNumber: 215
+                lineNumber: 330
               },
               __self: this
             },
@@ -2499,7 +2796,7 @@ var MultiplayerGame = function (_React$Component) {
             'div',
             { className: 'game-message', __source: {
                 fileName: _jsxFileName,
-                lineNumber: 219
+                lineNumber: 334
               },
               __self: this
             },
@@ -2515,7 +2812,7 @@ var MultiplayerGame = function (_React$Component) {
           isMyTurn: isMyTurn,
           __source: {
             fileName: _jsxFileName,
-            lineNumber: 222
+            lineNumber: 337
           },
           __self: this
         })
@@ -2552,7 +2849,7 @@ var GameModeSelector = function (_React$Component2) {
         return React.createElement(Game, {
           __source: {
             fileName: _jsxFileName,
-            lineNumber: 246
+            lineNumber: 361
           },
           __self: this
         });
@@ -2562,7 +2859,7 @@ var GameModeSelector = function (_React$Component2) {
         return React.createElement(MultiplayerGame, {
           __source: {
             fileName: _jsxFileName,
-            lineNumber: 250
+            lineNumber: 365
           },
           __self: this
         });
@@ -2572,7 +2869,7 @@ var GameModeSelector = function (_React$Component2) {
         'div',
         { className: 'mode-selector', __source: {
             fileName: _jsxFileName,
-            lineNumber: 254
+            lineNumber: 369
           },
           __self: this
         },
@@ -2581,7 +2878,7 @@ var GameModeSelector = function (_React$Component2) {
           {
             __source: {
               fileName: _jsxFileName,
-              lineNumber: 255
+              lineNumber: 370
             },
             __self: this
           },
@@ -2591,7 +2888,7 @@ var GameModeSelector = function (_React$Component2) {
           'div',
           { className: 'mode-buttons', __source: {
               fileName: _jsxFileName,
-              lineNumber: 256
+              lineNumber: 371
             },
             __self: this
           },
@@ -2604,7 +2901,7 @@ var GameModeSelector = function (_React$Component2) {
               },
               __source: {
                 fileName: _jsxFileName,
-                lineNumber: 257
+                lineNumber: 372
               },
               __self: this
             },
@@ -2619,7 +2916,7 @@ var GameModeSelector = function (_React$Component2) {
               },
               __source: {
                 fileName: _jsxFileName,
-                lineNumber: 263
+                lineNumber: 378
               },
               __self: this
             },

@@ -19,17 +19,21 @@ app.use(express.static(path.join(__dirname)));
 const gameRooms = new Map();
 
 class GameRoom {
-  constructor(roomId) {
+  constructor(roomId, gameMode = 'individual') {
     this.roomId = roomId;
+    this.gameMode = gameMode; // 'individual', 'team', or '1v1'
     this.players = [];
+    this.teams = { team1: [], team2: [] }; // For 2v2 mode
     this.gameState = {
-      game_state: 0,
+      game_state: 1, // Start multiplayer games in state 1 (skip initial play button)
       board_active: false,
       players: [],
       active_player: -1,
       dice_roll: -1,
       prev_player: undefined,
-      prev_roll: undefined
+      prev_roll: undefined,
+      game_mode: gameMode,
+      teams: { team1: [], team2: [] }
     };
     this.board = {
       green: {
@@ -59,34 +63,151 @@ class GameRoom {
     };
   }
 
+  getPlayerColor(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) return null;
+    
+    if (this.gameMode === '1v1') {
+      // In 1v1 mode, return the currently active color for this player
+      return player.currentColor || player.colors[0];
+    }
+    
+    return player.color;
+  }
+
+  setPlayerCurrentColor(playerId, color) {
+    if (this.gameMode !== '1v1') return false;
+    
+    const player = this.players.find(p => p.id === playerId);
+    if (!player || !player.colors.includes(color)) return false;
+    
+    player.currentColor = color;
+    return true;
+  }
+
   addPlayer(socket, playerName) {
     const colors = ["red", "green", "yellow", "blue"];
-    const availableColors = colors.filter(color => 
-      !this.players.find(p => p.color === color)
-    );
     
-    if (availableColors.length === 0) {
-      return false; // Room is full
+    if (this.gameMode === '1v1') {
+      // In 1v1 mode, each player gets 2 opposite colors
+      if (this.players.length >= 2) {
+        return false; // Only 2 players allowed in 1v1
+      }
+      
+      let playerColors = [];
+      if (this.players.length === 0) {
+        // First player gets red and green (opposite corners)
+        playerColors = ['red', 'green'];
+      } else {
+        // Second player gets yellow and blue (opposite corners)
+        playerColors = ['yellow', 'blue'];
+      }
+
+      const player = {
+        id: socket.id,
+        name: playerName,
+        colors: playerColors, // Array of colors this player controls
+        type: "HUMAN",
+        isMultiColor: true
+      };
+
+      this.players.push(player);
+      
+      // Add entries for both colors
+      playerColors.forEach(color => {
+        this.gameState.players.push({ 
+          color: color, 
+          type: "HUMAN", 
+          playerId: socket.id,
+          playerName: playerName,
+          isMultiColor: true
+        });
+      });
+      
+      return player;
+    } else if (this.gameMode === 'team') {
+      // Existing team logic
+      const availableColors = colors.filter(color => 
+        !this.players.find(p => p.color === color)
+      );
+      
+      if (availableColors.length === 0) {
+        return false; // Room is full
+      }
+
+      let team = null;
+      // Assign teams: red+yellow vs green+blue
+      if (availableColors.includes('red')) {
+        team = 'team1';
+      } else if (availableColors.includes('yellow')) {
+        team = 'team1';
+      } else if (availableColors.includes('green')) {
+        team = 'team2';
+      } else if (availableColors.includes('blue')) {
+        team = 'team2';
+      }
+
+      const player = {
+        id: socket.id,
+        name: playerName,
+        color: availableColors[0],
+        type: "HUMAN",
+        team: team
+      };
+
+      this.players.push(player);
+      this.gameState.players.push({ color: player.color, type: "HUMAN", team: team });
+      
+      if (team) {
+        this.teams[team].push(player);
+        this.gameState.teams[team].push(player.color);
+      }
+      
+      return player;
+    } else {
+      // Individual mode - existing logic
+      const availableColors = colors.filter(color => 
+        !this.players.find(p => p.color === color)
+      );
+      
+      if (availableColors.length === 0) {
+        return false; // Room is full
+      }
+
+      const player = {
+        id: socket.id,
+        name: playerName,
+        color: availableColors[0],
+        type: "HUMAN"
+      };
+
+      this.players.push(player);
+      this.gameState.players.push({ color: player.color, type: "HUMAN" });
+      
+      return player;
     }
-
-    const player = {
-      id: socket.id,
-      name: playerName,
-      color: availableColors[0],
-      type: "HUMAN"
-    };
-
-    this.players.push(player);
-    this.gameState.players.push({ color: player.color, type: "HUMAN" });
-    
-    return player;
   }
 
   removePlayer(socketId) {
     const playerIndex = this.players.findIndex(p => p.id === socketId);
     if (playerIndex !== -1) {
       const removedPlayer = this.players.splice(playerIndex, 1)[0];
-      this.gameState.players = this.gameState.players.filter(p => p.color !== removedPlayer.color);
+      
+      if (this.gameMode === '1v1') {
+        // Remove all colors associated with this player
+        this.gameState.players = this.gameState.players.filter(p => p.playerId !== socketId);
+      } else if (this.gameMode === 'team') {
+        this.gameState.players = this.gameState.players.filter(p => p.color !== removedPlayer.color);
+        
+        // Remove from team
+        if (removedPlayer.team) {
+          this.teams[removedPlayer.team] = this.teams[removedPlayer.team].filter(p => p.id !== socketId);
+          this.gameState.teams[removedPlayer.team] = this.gameState.teams[removedPlayer.team].filter(color => color !== removedPlayer.color);
+        }
+      } else {
+        this.gameState.players = this.gameState.players.filter(p => p.color !== removedPlayer.color);
+      }
+      
       return removedPlayer;
     }
     return null;
@@ -97,6 +218,9 @@ class GameRoom {
   }
 
   isFull() {
+    if (this.gameMode === '1v1') {
+      return this.players.length >= 2;
+    }
     return this.players.length >= 4;
   }
 
@@ -243,10 +367,28 @@ class GameRoom {
       board[player][coin].status = 2;
 
       // Check game over condition
-      if (Object.values(board[player]).every(coin => coin.status === 2)) {
-        gameOver = true;
+      if (this.gameMode === 'team') {
+        const winningTeam = this.checkTeamWin();
+        if (winningTeam) {
+          gameOver = true;
+          game.winning_team = winningTeam;
+        } else {
+          playAgain = true;
+        }
+      } else if (this.gameMode === '1v1') {
+        const winner = this.check1v1Win();
+        if (winner) {
+          gameOver = true;
+          game.winner = winner;
+        } else {
+          playAgain = true;
+        }
       } else {
-        playAgain = true;
+        if (Object.values(board[player]).every(coin => coin.status === 2)) {
+          gameOver = true;
+        } else {
+          playAgain = true;
+        }
       }
     } else {
       // Move the active coin
@@ -305,7 +447,70 @@ class GameRoom {
   }
 
   canStart() {
+    if (this.gameMode === 'team') {
+      return this.players.length === 4; // Need exactly 4 players for 2v2
+    } else if (this.gameMode === '1v1') {
+      return this.players.length === 2; // Need exactly 2 players for 1v1
+    }
     return this.players.length >= 2;
+  }
+
+  check1v1Win() {
+    if (this.gameMode !== '1v1') return null;
+
+    const board_metadata = {
+      green: { finish: 104 },
+      blue: { finish: 117 },
+      yellow: { finish: 130 },
+      red: { finish: 143 }
+    };
+
+    // Check if player 1 (red + green) has won
+    const player1Colors = ['red', 'green'];
+    const player1Won = player1Colors.every(color => {
+      return Object.values(this.board[color]).every(coin => coin.status === 2);
+    });
+
+    if (player1Won) return this.players[0];
+
+    // Check if player 2 (yellow + blue) has won
+    const player2Colors = ['yellow', 'blue'];
+    const player2Won = player2Colors.every(color => {
+      return Object.values(this.board[color]).every(coin => coin.status === 2);
+    });
+
+    if (player2Won) return this.players[1];
+
+    return null;
+  }
+
+  checkTeamWin() {
+    if (this.gameMode !== 'team') return null;
+
+    const board_metadata = {
+      green: { finish: 104 },
+      blue: { finish: 117 },
+      yellow: { finish: 130 },
+      red: { finish: 143 }
+    };
+
+    // Check if team1 (red + yellow) has won
+    const team1Colors = ['red', 'yellow'];
+    const team1Won = team1Colors.every(color => {
+      return Object.values(this.board[color]).every(coin => coin.status === 2);
+    });
+
+    if (team1Won) return 'team1';
+
+    // Check if team2 (green + blue) has won
+    const team2Colors = ['green', 'blue'];
+    const team2Won = team2Colors.every(color => {
+      return Object.values(this.board[color]).every(coin => coin.status === 2);
+    });
+
+    if (team2Won) return 'team2';
+
+    return null;
   }
 }
 
@@ -314,13 +519,22 @@ io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
   socket.on('join-room', (data) => {
-    const { roomId, playerName } = data;
+    const { roomId, playerName, gameMode = 'individual' } = data;
     
     if (!gameRooms.has(roomId)) {
-      gameRooms.set(roomId, new GameRoom(roomId));
+      gameRooms.set(roomId, new GameRoom(roomId, gameMode));
     }
 
     const room = gameRooms.get(roomId);
+    
+    // Check if game mode matches
+    if (room.gameMode !== gameMode) {
+      socket.emit('game-mode-mismatch', { 
+        expectedMode: room.gameMode,
+        providedMode: gameMode 
+      });
+      return;
+    }
     
     if (room.isFull()) {
       socket.emit('room-full');
@@ -342,17 +556,19 @@ io.on('connection', (socket) => {
       player,
       gameState: room.gameState,
       board: room.board,
-      players: room.players
+      players: room.players,
+      teams: room.teams
     });
 
     // Notify other players in the room
     socket.to(roomId).emit('player-joined', {
       player,
       players: room.players,
+      teams: room.teams,
       gameState: room.gameState
     });
 
-    console.log(`Player ${playerName} joined room ${roomId} as ${player.color}`);
+    console.log(`Player ${playerName} joined room ${roomId} as ${player.color} (${gameMode} mode)${player.team ? ` on ${player.team}` : ''}`);
   });
 
   socket.on('start-game', () => {
@@ -425,6 +641,8 @@ io.on('connection', (socket) => {
       coin,
       playAgain: result.playAgain,
       gameOver: result.gameOver,
+      winningTeam: room.gameState.winning_team,
+      winner: room.gameState.winner,
       gameState: room.gameState,
       board: room.board
     });
