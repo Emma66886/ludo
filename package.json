@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "NODE_ENV=development BABEL_ENV=development babel --watch --presets react-app src -o ludo.js",
+    "build": "npm install",
     "docs": "cp ludo.js docs/ && cp ludo.css docs/ && cp components.css docs/ && cp index.html docs/",
     "start": "node server.js",
     "dev": "nodemon server.js",
