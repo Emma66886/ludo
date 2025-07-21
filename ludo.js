@@ -1,8 +1,3 @@
-
-//Savio Martin
-//https://github.com/saviomartin
-//https://instagram.com/teen_developer
-
 var isBotsTurn = function isBotsTurn(game) {
   return game.game_state === 2 && game.players[game.active_player].type === "BOT";
 };
@@ -1948,10 +1943,692 @@ var Game = function (_React$Component) {
   return Game;
 }(React.Component);
 
-ReactDOM.render(React.createElement(Game, {
+// Game Mode Selector Component
+
+
+var GameModeSelector = function (_React$Component2) {
+  _inherits(GameModeSelector, _React$Component2);
+
+  function GameModeSelector(props) {
+    _classCallCheck(this, GameModeSelector);
+
+    var _this2 = _possibleConstructorReturn(this, (GameModeSelector.__proto__ || Object.getPrototypeOf(GameModeSelector)).call(this, props));
+
+    _this2.state = {
+      selectedMode: null
+    };
+    return _this2;
+  }
+
+  _createClass(GameModeSelector, [{
+    key: "render",
+    value: function render() {
+      var _this3 = this;
+
+      if (this.state.selectedMode === 'single') {
+        return React.createElement(Game, {
+          __source: {
+            fileName: _jsxFileName,
+            lineNumber: 313
+          },
+          __self: this
+        });
+      }
+
+      if (this.state.selectedMode === 'multi') {
+        return React.createElement(MultiplayerGame, {
+          __source: {
+            fileName: _jsxFileName,
+            lineNumber: 317
+          },
+          __self: this
+        });
+      }
+
+      return React.createElement(
+        "div",
+        { className: "mode-selector", __source: {
+            fileName: _jsxFileName,
+            lineNumber: 321
+          },
+          __self: this
+        },
+        React.createElement(
+          "h1",
+          {
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 322
+            },
+            __self: this
+          },
+          "Ludo Game"
+        ),
+        React.createElement(
+          "div",
+          { className: "mode-buttons", __source: {
+              fileName: _jsxFileName,
+              lineNumber: 323
+            },
+            __self: this
+          },
+          React.createElement(
+            "button",
+            {
+              className: "mode-btn single-player",
+              onClick: function onClick() {
+                return _this3.setState({ selectedMode: 'single' });
+              },
+              __source: {
+                fileName: _jsxFileName,
+                lineNumber: 324
+              },
+              __self: this
+            },
+            "Single Player / Local Multiplayer"
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "mode-btn multiplayer",
+              onClick: function onClick() {
+                return _this3.setState({ selectedMode: 'multi' });
+              },
+              __source: {
+                fileName: _jsxFileName,
+                lineNumber: 330
+              },
+              __self: this
+            },
+            "Online Multiplayer"
+          )
+        )
+      );
+    }
+  }]);
+
+  return GameModeSelector;
+}(React.Component);
+
+ReactDOM.render(React.createElement(GameModeSelector, {
   __source: {
     fileName: _jsxFileName,
-    lineNumber: 302
+    lineNumber: 342
   },
   __self: this
 }), document.getElementById("root"));
+var _jsxFileName = 'src/multiplayer.js';
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+// Multiplayer Game Component with Socket.IO integration
+var MultiplayerGame = function (_React$Component) {
+  _inherits(MultiplayerGame, _React$Component);
+
+  function MultiplayerGame(props) {
+    _classCallCheck(this, MultiplayerGame);
+
+    var _this = _possibleConstructorReturn(this, (MultiplayerGame.__proto__ || Object.getPrototypeOf(MultiplayerGame)).call(this, props));
+
+    _this.state = {
+      socket: null,
+      connected: false,
+      roomId: '',
+      playerName: '',
+      currentPlayer: null,
+      players: [],
+      game: Object.assign({}, game_init),
+      board: JSON.parse(JSON.stringify(board_init)),
+      showJoinForm: true,
+      gameMessage: '',
+      isMyTurn: false
+    };
+
+    _this.initSocket = _this.initSocket.bind(_this);
+    _this.joinRoom = _this.joinRoom.bind(_this);
+    _this.startGame = _this.startGame.bind(_this);
+    _this.rollDice = _this.rollDice.bind(_this);
+    _this.play = _this.play.bind(_this);
+    return _this;
+  }
+
+  _createClass(MultiplayerGame, [{
+    key: 'componentDidMount',
+    value: function componentDidMount() {
+      this.initSocket();
+    }
+  }, {
+    key: 'componentWillUnmount',
+    value: function componentWillUnmount() {
+      if (this.state.socket) {
+        this.state.socket.disconnect();
+      }
+    }
+  }, {
+    key: 'initSocket',
+    value: function initSocket() {
+      var _this2 = this;
+
+      var socket = io();
+
+      socket.on('connect', function () {
+        console.log('Connected to server');
+        _this2.setState({ connected: true, socket: socket });
+      });
+
+      socket.on('disconnect', function () {
+        console.log('Disconnected from server');
+        _this2.setState({ connected: false });
+      });
+
+      socket.on('joined-room', function (data) {
+        console.log('Joined room:', data);
+        _this2.setState({
+          currentPlayer: data.player,
+          players: data.players,
+          game: data.gameState,
+          board: data.board,
+          showJoinForm: false,
+          gameMessage: 'You joined as ' + data.player.color + ' player'
+        });
+      });
+
+      socket.on('player-joined', function (data) {
+        console.log('Player joined:', data);
+        _this2.setState({
+          players: data.players,
+          game: data.gameState,
+          gameMessage: data.player.name + ' joined as ' + data.player.color
+        });
+      });
+
+      socket.on('player-left', function (data) {
+        console.log('Player left:', data);
+        _this2.setState({
+          players: data.players,
+          gameMessage: data.player.name + ' left the game'
+        });
+      });
+
+      socket.on('room-full', function () {
+        _this2.setState({
+          gameMessage: 'Room is full! Try another room.'
+        });
+      });
+
+      socket.on('game-started', function (data) {
+        console.log('Game started:', data);
+        _this2.setState({
+          game: data.gameState,
+          board: data.board,
+          gameMessage: 'Game started!',
+          isMyTurn: _this2.isMyTurn(data.gameState)
+        });
+      });
+
+      socket.on('dice-rolled', function (data) {
+        console.log('Dice rolled:', data);
+        _this2.setState({
+          game: data.gameState,
+          board: data.board,
+          gameMessage: 'Player rolled ' + data.diceRoll,
+          isMyTurn: _this2.isMyTurn(data.gameState)
+        });
+      });
+
+      socket.on('move-made', function (data) {
+        console.log('Move made:', data);
+        _this2.setState({
+          game: data.gameState,
+          board: data.board,
+          gameMessage: 'Player made a move',
+          isMyTurn: _this2.isMyTurn(data.gameState)
+        });
+      });
+    }
+  }, {
+    key: 'isMyTurn',
+    value: function isMyTurn(gameState) {
+      var _this3 = this;
+
+      if (!this.state.currentPlayer || !this.state.players.length) return false;
+      var myPlayerIndex = this.state.players.findIndex(function (p) {
+        return p.id === _this3.state.currentPlayer.id;
+      });
+      return gameState.active_player === myPlayerIndex;
+    }
+  }, {
+    key: 'joinRoom',
+    value: function joinRoom() {
+      var _state = this.state,
+          socket = _state.socket,
+          roomId = _state.roomId,
+          playerName = _state.playerName;
+
+      if (!socket || !roomId.trim() || !playerName.trim()) {
+        this.setState({ gameMessage: 'Please enter both room ID and your name' });
+        return;
+      }
+
+      socket.emit('join-room', { roomId: roomId.trim(), playerName: playerName.trim() });
+    }
+  }, {
+    key: 'startGame',
+    value: function startGame() {
+      var socket = this.state.socket;
+
+      if (!socket) return;
+      socket.emit('start-game');
+    }
+  }, {
+    key: 'rollDice',
+    value: function rollDice() {
+      var socket = this.state.socket;
+
+      if (!socket || !this.state.isMyTurn) return;
+      socket.emit('roll-dice');
+    }
+  }, {
+    key: 'play',
+    value: function play(playerIdx, coin, diceRoll) {
+      var socket = this.state.socket;
+
+      if (!socket || !this.state.isMyTurn) return;
+      socket.emit('make-move', { coin: coin });
+    }
+  }, {
+    key: 'render',
+    value: function render() {
+      var _this4 = this;
+
+      var _state2 = this.state,
+          showJoinForm = _state2.showJoinForm,
+          connected = _state2.connected,
+          gameMessage = _state2.gameMessage,
+          game = _state2.game,
+          board = _state2.board,
+          players = _state2.players,
+          currentPlayer = _state2.currentPlayer,
+          isMyTurn = _state2.isMyTurn;
+
+
+      if (!connected) {
+        return React.createElement(
+          'div',
+          { className: 'multiplayer-container', __source: {
+              fileName: _jsxFileName,
+              lineNumber: 154
+            },
+            __self: this
+          },
+          React.createElement(
+            'div',
+            { className: 'connection-status', __source: {
+                fileName: _jsxFileName,
+                lineNumber: 155
+              },
+              __self: this
+            },
+            React.createElement(
+              'h2',
+              {
+                __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 156
+                },
+                __self: this
+              },
+              'Connecting to server...'
+            )
+          )
+        );
+      }
+
+      if (showJoinForm) {
+        return React.createElement(
+          'div',
+          { className: 'multiplayer-container', __source: {
+              fileName: _jsxFileName,
+              lineNumber: 164
+            },
+            __self: this
+          },
+          React.createElement(
+            'div',
+            { className: 'join-form', __source: {
+                fileName: _jsxFileName,
+                lineNumber: 165
+              },
+              __self: this
+            },
+            React.createElement(
+              'h2',
+              {
+                __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 166
+                },
+                __self: this
+              },
+              'Join Multiplayer Ludo Game'
+            ),
+            React.createElement(
+              'div',
+              { className: 'form-group', __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 167
+                },
+                __self: this
+              },
+              React.createElement(
+                'label',
+                {
+                  __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 168
+                  },
+                  __self: this
+                },
+                'Your Name:'
+              ),
+              React.createElement('input', {
+                type: 'text',
+                value: this.state.playerName,
+                onChange: function onChange(e) {
+                  return _this4.setState({ playerName: e.target.value });
+                },
+                placeholder: 'Enter your name',
+                __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 169
+                },
+                __self: this
+              })
+            ),
+            React.createElement(
+              'div',
+              { className: 'form-group', __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 176
+                },
+                __self: this
+              },
+              React.createElement(
+                'label',
+                {
+                  __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 177
+                  },
+                  __self: this
+                },
+                'Room ID:'
+              ),
+              React.createElement('input', {
+                type: 'text',
+                value: this.state.roomId,
+                onChange: function onChange(e) {
+                  return _this4.setState({ roomId: e.target.value });
+                },
+                placeholder: 'Enter room ID (e.g., room123)',
+                __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 178
+                },
+                __self: this
+              })
+            ),
+            React.createElement(
+              'button',
+              { onClick: this.joinRoom, className: 'join-btn', __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 185
+                },
+                __self: this
+              },
+              'Join Game'
+            ),
+            gameMessage && React.createElement(
+              'div',
+              { className: 'game-message', __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 188
+                },
+                __self: this
+              },
+              gameMessage
+            )
+          )
+        );
+      }
+
+      return React.createElement(
+        'div',
+        { className: 'multiplayer-container', __source: {
+            fileName: _jsxFileName,
+            lineNumber: 195
+          },
+          __self: this
+        },
+        React.createElement(
+          'div',
+          { className: 'game-info', __source: {
+              fileName: _jsxFileName,
+              lineNumber: 196
+            },
+            __self: this
+          },
+          React.createElement(
+            'h3',
+            {
+              __source: {
+                fileName: _jsxFileName,
+                lineNumber: 197
+              },
+              __self: this
+            },
+            'Multiplayer Ludo - Room: ',
+            this.state.roomId
+          ),
+          React.createElement(
+            'div',
+            { className: 'players-list', __source: {
+                fileName: _jsxFileName,
+                lineNumber: 198
+              },
+              __self: this
+            },
+            React.createElement(
+              'h4',
+              {
+                __source: {
+                  fileName: _jsxFileName,
+                  lineNumber: 199
+                },
+                __self: this
+              },
+              'Players (',
+              players.length,
+              '/4):'
+            ),
+            players.map(function (player, index) {
+              return React.createElement(
+                'div',
+                { key: player.id, className: 'player-info ' + player.color, __source: {
+                    fileName: _jsxFileName,
+                    lineNumber: 201
+                  },
+                  __self: _this4
+                },
+                player.name,
+                ' (',
+                player.color,
+                ')',
+                currentPlayer && player.id === currentPlayer.id && ' - You',
+                game.active_player === index && ' - Current Turn'
+              );
+            })
+          ),
+          game.game_state === 1 && players.length >= 2 && React.createElement(
+            'button',
+            { onClick: this.startGame, className: 'start-btn', __source: {
+                fileName: _jsxFileName,
+                lineNumber: 210
+              },
+              __self: this
+            },
+            'Start Game'
+          ),
+          React.createElement(
+            'div',
+            { className: 'turn-indicator', __source: {
+                fileName: _jsxFileName,
+                lineNumber: 215
+              },
+              __self: this
+            },
+            isMyTurn ? "Your Turn!" : "Waiting for other player..."
+          ),
+          gameMessage && React.createElement(
+            'div',
+            { className: 'game-message', __source: {
+                fileName: _jsxFileName,
+                lineNumber: 219
+              },
+              __self: this
+            },
+            gameMessage
+          )
+        ),
+        React.createElement(Board, {
+          board: board,
+          game: game,
+          coinClickHandler: this.play,
+          diceClickHandler: this.rollDice,
+          isMultiplayer: true,
+          isMyTurn: isMyTurn,
+          __source: {
+            fileName: _jsxFileName,
+            lineNumber: 222
+          },
+          __self: this
+        })
+      );
+    }
+  }]);
+
+  return MultiplayerGame;
+}(React.Component);
+
+// Create a game mode selector
+
+
+var GameModeSelector = function (_React$Component2) {
+  _inherits(GameModeSelector, _React$Component2);
+
+  function GameModeSelector(props) {
+    _classCallCheck(this, GameModeSelector);
+
+    var _this5 = _possibleConstructorReturn(this, (GameModeSelector.__proto__ || Object.getPrototypeOf(GameModeSelector)).call(this, props));
+
+    _this5.state = {
+      selectedMode: null
+    };
+    return _this5;
+  }
+
+  _createClass(GameModeSelector, [{
+    key: 'render',
+    value: function render() {
+      var _this6 = this;
+
+      if (this.state.selectedMode === 'single') {
+        return React.createElement(Game, {
+          __source: {
+            fileName: _jsxFileName,
+            lineNumber: 246
+          },
+          __self: this
+        });
+      }
+
+      if (this.state.selectedMode === 'multi') {
+        return React.createElement(MultiplayerGame, {
+          __source: {
+            fileName: _jsxFileName,
+            lineNumber: 250
+          },
+          __self: this
+        });
+      }
+
+      return React.createElement(
+        'div',
+        { className: 'mode-selector', __source: {
+            fileName: _jsxFileName,
+            lineNumber: 254
+          },
+          __self: this
+        },
+        React.createElement(
+          'h1',
+          {
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 255
+            },
+            __self: this
+          },
+          'Ludo Game'
+        ),
+        React.createElement(
+          'div',
+          { className: 'mode-buttons', __source: {
+              fileName: _jsxFileName,
+              lineNumber: 256
+            },
+            __self: this
+          },
+          React.createElement(
+            'button',
+            {
+              className: 'mode-btn single-player',
+              onClick: function onClick() {
+                return _this6.setState({ selectedMode: 'single' });
+              },
+              __source: {
+                fileName: _jsxFileName,
+                lineNumber: 257
+              },
+              __self: this
+            },
+            'Single Player / Local Multiplayer'
+          ),
+          React.createElement(
+            'button',
+            {
+              className: 'mode-btn multiplayer',
+              onClick: function onClick() {
+                return _this6.setState({ selectedMode: 'multi' });
+              },
+              __source: {
+                fileName: _jsxFileName,
+                lineNumber: 263
+              },
+              __self: this
+            },
+            'Online Multiplayer'
+          )
+        )
+      );
+    }
+  }]);
+
+  return GameModeSelector;
+}(React.Component);

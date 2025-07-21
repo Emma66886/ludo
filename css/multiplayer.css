@@ -1,0 +1,195 @@
+/* Multiplayer Game Styles */
+.multiplayer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+
+.mode-selector {
+  text-align: center;
+  padding: 50px;
+}
+
+.mode-selector h1 {
+  font-size: 3rem;
+  color: #333;
+  margin-bottom: 40px;
+}
+
+.mode-buttons {
+  display: flex;
+  gap: 30px;
+  justify-content: center;
+}
+
+.mode-btn {
+  padding: 20px 40px;
+  font-size: 1.2rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+  font-weight: bold;
+}
+
+.mode-btn.single-player {
+  background: linear-gradient(45deg, #4CAF50, #45a049);
+}
+
+.mode-btn.multiplayer {
+  background: linear-gradient(45deg, #2196F3, #1976D2);
+}
+
+.mode-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.connection-status {
+  text-align: center;
+  padding: 50px;
+}
+
+.join-form {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  max-width: 400px;
+  width: 100%;
+}
+
+.join-form h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #555;
+  font-weight: bold;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #ddd;
+  border-radius: 5px;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  border-color: #2196F3;
+  outline: none;
+}
+
+.join-btn, .start-btn {
+  width: 100%;
+  padding: 12px;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.join-btn:hover, .start-btn:hover {
+  background: #1976D2;
+}
+
+.game-info {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+  min-width: 300px;
+}
+
+.game-info h3 {
+  margin-top: 0;
+  color: #333;
+}
+
+.players-list {
+  margin: 15px 0;
+}
+
+.players-list h4 {
+  margin-bottom: 10px;
+  color: #555;
+}
+
+.player-info {
+  padding: 8px 12px;
+  margin: 5px 0;
+  border-radius: 5px;
+  font-weight: bold;
+}
+
+.player-info.red {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.player-info.green {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.player-info.yellow {
+  background: #fff8e1;
+  color: #f57f17;
+}
+
+.player-info.blue {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.turn-indicator {
+  padding: 10px;
+  text-align: center;
+  font-weight: bold;
+  border-radius: 5px;
+  margin: 10px 0;
+}
+
+.game-message {
+  padding: 10px;
+  background: #e1f5fe;
+  border-left: 4px solid #2196F3;
+  margin: 10px 0;
+  border-radius: 3px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .mode-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .mode-btn {
+    width: 250px;
+  }
+  
+  .multiplayer-container {
+    padding: 10px;
+  }
+  
+  .join-form {
+    margin: 0 10px;
+  }
+}

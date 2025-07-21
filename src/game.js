@@ -299,4 +299,44 @@ class Game extends React.Component {
   }
 }
 
-ReactDOM.render(<Game />, document.getElementById("root"));
+// Game Mode Selector Component
+class GameModeSelector extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      selectedMode: null
+    };
+  }
+
+  render() {
+    if (this.state.selectedMode === 'single') {
+      return <Game />;
+    }
+
+    if (this.state.selectedMode === 'multi') {
+      return <MultiplayerGame />;
+    }
+
+    return (
+      <div className="mode-selector">
+        <h1>Ludo Game</h1>
+        <div className="mode-buttons">
+          <button 
+            className="mode-btn single-player"
+            onClick={() => this.setState({ selectedMode: 'single' })}
+          >
+            Single Player / Local Multiplayer
+          </button>
+          <button 
+            className="mode-btn multiplayer"
+            onClick={() => this.setState({ selectedMode: 'multi' })}
+          >
+            Online Multiplayer
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
+ReactDOM.render(<GameModeSelector />, document.getElementById("root"));
